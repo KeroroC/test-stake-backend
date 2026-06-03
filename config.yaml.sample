@@ -1,0 +1,11 @@
+server:
+  host: localhost
+  port: 8080
+  # debug/test/release
+  mode: debug
+database:
+  host: 192.168.110.2
+  port: 33061
+  username: root
+  password: JsTcztDxuU
+  dbname: stake

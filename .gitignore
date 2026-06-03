@@ -1,0 +1,7 @@
+*.yaml
+.idea
+/bin
+*.exe
+.DS_Store
+.vscode
+.env
