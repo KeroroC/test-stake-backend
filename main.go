@@ -38,7 +38,7 @@ func main() {
 		log.Fatalf("failed to connect database, %v", err)
 	}
 	// 自动迁移
-	if err := db.AutoMigrate(&models.Contract{}, &models.ContractEvent{}); err != nil {
+	if err := db.AutoMigrate(&models.Contract{}, &models.StakedEvent{}); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
