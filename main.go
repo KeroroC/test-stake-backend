@@ -68,7 +68,9 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
-	api.RegisterRoutes(r)
+	if err := api.RegisterRoutes(r, db); err != nil {
+		log.Fatalf("Failed to register routes: %v", err)
+	}
 	if err := r.Run(); err != nil {
 		log.Fatalf("Failed to run server: %s", err)
 	}
