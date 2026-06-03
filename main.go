@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"test-stake-backend/internal/api"
 	"test-stake-backend/internal/config"
 	"test-stake-backend/internal/models"
 
@@ -42,6 +43,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
+	api.RegisterRoutes(r)
 	if err := r.Run(); err != nil {
 		log.Fatalf("Failed to run server: %s", err)
 	}
