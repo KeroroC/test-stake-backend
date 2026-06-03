@@ -7,8 +7,10 @@ import (
 )
 
 type Config struct {
-	Server   Server   `mapstructure:"server"`
-	Database Database `mapstructure:"database"`
+	Server    Server    `mapstructure:"server"`
+	Database  Database  `mapstructure:"database"`
+	Redis     Redis     `mapstructure:"redis"`
+	ETHConfig ETHConfig `mapstructure:"eth"`
 }
 
 type Server struct {
@@ -23,6 +25,18 @@ type Database struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
 	DBName   string `mapstructure:"dbname"`
+}
+
+type Redis struct {
+	Addr     string `mapstructure:"addr"`
+	Password string `mapstructure:"password"`
+	DB       int    `mapstructure:"db"`
+}
+
+type ETHConfig struct {
+	RPCUrl       string `mapstructure:"rpc_url"`
+	WSUrl        string `mapstructure:"ws_url"`
+	StakeAddress string `mapstructure:"stake_address"`
 }
 
 func Load() *Config {

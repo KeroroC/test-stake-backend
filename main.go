@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"test-stake-backend/internal/api"
 	"test-stake-backend/internal/config"
 	"test-stake-backend/internal/models"
+	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -15,10 +19,10 @@ import (
 )
 
 func main() {
-	// 加载配置
+	// 1.加载配置
 	cfg := config.Load()
 
-	// 初始化数据库
+	// 2.初始化数据库
 	dbConfig := cfg.Database
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbConfig.Username, dbConfig.Password, dbConfig.Host, dbConfig.Port, dbConfig.DBName)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
@@ -33,10 +37,31 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect database, %v", err)
 	}
-
-	if err := db.AutoMigrate(&models.Contract{}); err != nil {
+	// 自动迁移
+	if err := db.AutoMigrate(&models.Contract{}, &models.ContractEvent{}); err != nil {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
+
+	// 3.初始化Redis连接
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     cfg.Redis.Addr,
+		Password: cfg.Redis.Password,
+		DB:       cfg.Redis.DB,
+	})
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			log.Fatalf("Failed to close redis: %v", err)
+		}
+	}()
+
+	// 4.初始化eth连接
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	rpcClient, err := ethclient.DialContext(ctx, cfg.ETHConfig.RPCUrl)
+	if err != nil {
+		log.Fatalf("Failed to conncect ETH client: %v", err)
+	}
+	defer rpcClient.Close()
 
 	// 启动gin
 	if cfg.Server.Mode == "release" {

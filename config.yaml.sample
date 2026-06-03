@@ -7,5 +7,13 @@ database:
   host: 192.168.110.2
   port: 33061
   username: root
-  password: JsTcztDxuU
+  password: root
   dbname: stake
+redis:
+  addr: localhost:3306
+  password: 123
+  db: 0
+eth:
+  rpc_url: https://sepolia.infura.io/v3/XXX
+  ws_url: wss://sepolia.infura.io/ws/v3/XXX
+  stake_address: 0x0
