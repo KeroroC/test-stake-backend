@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"math/big"
-	"os"
-	"strings"
 
 	"test-stake-backend/internal/models"
 	"test-stake-backend/internal/repository"
@@ -16,10 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-const (
-	stakedEventName = "Staked"
-	stakeABIPath    = "internal/abi/Stake.abi.json"
-)
+const stakedEventName = "Staked"
 
 // StakedEventLogHandler 解析 Staked 事件并写入数据库。
 type StakedEventLogHandler struct {
@@ -103,16 +98,3 @@ func (h *StakedEventLogHandler) parseLog(eventLog types.Log) (*models.StakedEven
 	}, nil
 }
 
-func loadStakeABI() (abi.ABI, error) {
-	abiBytes, err := os.ReadFile(stakeABIPath)
-	if err != nil {
-		return abi.ABI{}, fmt.Errorf("read stake ABI file: %w", err)
-	}
-
-	contractABI, err := abi.JSON(strings.NewReader(string(abiBytes)))
-	if err != nil {
-		return abi.ABI{}, fmt.Errorf("parse stake ABI: %w", err)
-	}
-
-	return contractABI, nil
-}
