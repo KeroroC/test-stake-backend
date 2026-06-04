@@ -17,3 +17,5 @@ eth:
   rpc_url: https://sepolia.infura.io/v3/XXX
   ws_url: wss://sepolia.infura.io/ws/v3/XXX
   stake_address: 0x0
+  # 该填合约部署区块
+  start_block: 10986812

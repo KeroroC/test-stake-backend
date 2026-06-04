@@ -96,8 +96,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create reward rate updated event repository: %v", err)
 	}
+	contractRepo, err := repository.NewContractRepository(db)
+	if err != nil {
+		log.Fatalf("Failed to create contract repository: %v", err)
+	}
 
-	contractEventListener, err := listener.NewContractEventListener(cfg.ETHConfig.WSUrl, cfg.ETHConfig.StakeAddress)
+	contractEventListener, err := listener.NewContractEventListener(cfg.ETHConfig.WSUrl, cfg.ETHConfig.StakeAddress, contractRepo, cfg.ETHConfig.StartBlock)
 	if err != nil {
 		log.Fatalf("Failed to create contract event listener: %v", err)
 	}

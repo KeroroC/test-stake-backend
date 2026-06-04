@@ -37,6 +37,7 @@ type ETHConfig struct {
 	RPCUrl       string `mapstructure:"rpc_url"`
 	WSUrl        string `mapstructure:"ws_url"`
 	StakeAddress string `mapstructure:"stake_address"`
+	StartBlock   uint64 `mapstructure:"start_block"`
 }
 
 func Load() *Config {
