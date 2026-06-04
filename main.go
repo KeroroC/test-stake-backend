@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	"os/signal"
+	"syscall"
 	"test-stake-backend/internal/api"
 	"test-stake-backend/internal/config"
 	"test-stake-backend/internal/listener"
@@ -21,6 +24,9 @@ import (
 )
 
 func main() {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
 	// 1.加载配置
 	cfg := config.Load()
 
@@ -29,7 +35,6 @@ func main() {
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", dbConfig.Username, dbConfig.Password, dbConfig.Host, dbConfig.Port, dbConfig.DBName)
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
-
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix:   "t_",
 			SingularTable: true,
@@ -39,7 +44,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to connect database, %v", err)
 	}
-	// 自动迁移
 	if err := db.AutoMigrate(
 		&models.Contract{},
 		&models.StakedEvent{},
@@ -57,21 +61,21 @@ func main() {
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
 	})
-	defer func() {
-		if err := redisClient.Close(); err != nil {
+	defer func(redisClient *redis.Client) {
+		err := redisClient.Close()
+		if err != nil {
 			log.Fatalf("Failed to close redis: %v", err)
 		}
-	}()
+	}(redisClient)
 
 	// 4.初始化eth连接
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
 	rpcClient, err := ethclient.DialContext(ctx, cfg.ETHConfig.RPCUrl)
 	if err != nil {
-		log.Fatalf("Failed to conncect ETH client: %v", err)
+		log.Fatalf("Failed to connect ETH client: %v", err)
 	}
 	defer rpcClient.Close()
 
+	// 5.注册事件处理器
 	stakedEventRepo, err := repository.NewStakedEventRepository(db)
 	if err != nil {
 		log.Fatalf("Failed to create staked event repository: %v", err)
@@ -97,29 +101,34 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create contract event listener: %v", err)
 	}
-
-	handlers := []listener.ContractEventHandler{}
 	for _, newHandler := range []func() (listener.ContractEventHandler, error){
-		func() (listener.ContractEventHandler, error) { return listener.NewStakedEventLogHandler(stakedEventRepo) },
-		func() (listener.ContractEventHandler, error) { return listener.NewRewardClaimedEventLogHandler(rewardClaimedEventRepo) },
-		func() (listener.ContractEventHandler, error) { return listener.NewWithdrawnEventLogHandler(withdrawnEventRepo) },
-		func() (listener.ContractEventHandler, error) { return listener.NewMinStakeAmountUpdatedEventLogHandler(minStakeAmountUpdatedEventRepo) },
-		func() (listener.ContractEventHandler, error) { return listener.NewRewardRateUpdatedEventLogHandler(rewardRateUpdatedEventRepo) },
+		func() (listener.ContractEventHandler, error) {
+			return listener.NewStakedEventLogHandler(stakedEventRepo)
+		},
+		func() (listener.ContractEventHandler, error) {
+			return listener.NewRewardClaimedEventLogHandler(rewardClaimedEventRepo)
+		},
+		func() (listener.ContractEventHandler, error) {
+			return listener.NewWithdrawnEventLogHandler(withdrawnEventRepo)
+		},
+		func() (listener.ContractEventHandler, error) {
+			return listener.NewMinStakeAmountUpdatedEventLogHandler(minStakeAmountUpdatedEventRepo)
+		},
+		func() (listener.ContractEventHandler, error) {
+			return listener.NewRewardRateUpdatedEventLogHandler(rewardRateUpdatedEventRepo)
+		},
 	} {
 		h, err := newHandler()
 		if err != nil {
 			log.Fatalf("Failed to create event handler: %v", err)
 		}
-		handlers = append(handlers, h)
-	}
-	for _, h := range handlers {
 		if err := contractEventListener.Register(h); err != nil {
 			log.Fatalf("Failed to register %s event handler: %v", h.EventName(), err)
 		}
 	}
-	go contractEventListener.Start(context.Background())
+	go contractEventListener.Start(ctx)
 
-	// 启动gin
+	// 6. 启动 HTTP 服务
 	if cfg.Server.Mode == "release" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -127,7 +136,29 @@ func main() {
 	if err := api.RegisterRoutes(r, db); err != nil {
 		log.Fatalf("Failed to register routes: %v", err)
 	}
-	if err := r.Run(cfg.Server.Host + ":" + cfg.Server.Port); err != nil {
-		log.Fatalf("Failed to run server: %s", err)
+
+	srv := &http.Server{
+		Addr:    cfg.Server.Host + ":" + cfg.Server.Port,
+		Handler: r,
 	}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil {
+			log.Fatalf("Failed to run server: %v", err)
+		}
+	}()
+
+	log.Printf("server started on %s", srv.Addr)
+
+	<-ctx.Done()
+	log.Println("shutting down...")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer shutdownCancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("http server shutdown error: %v", err)
+	}
+
+	log.Println("server stopped")
 }
