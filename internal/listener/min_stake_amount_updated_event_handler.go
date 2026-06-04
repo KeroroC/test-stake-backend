@@ -6,6 +6,7 @@ import (
 	"log"
 	"math/big"
 
+	pkgabi "test-stake-backend/internal/abi"
 	"test-stake-backend/internal/models"
 	"test-stake-backend/internal/repository"
 
@@ -29,7 +30,7 @@ func NewMinStakeAmountUpdatedEventLogHandler(repo *repository.MinStakeAmountUpda
 		return nil, fmt.Errorf("create min stake amount updated event handler: repository is nil")
 	}
 
-	contractABI, err := loadStakeABI()
+	contractABI, err := pkgabi.LoadStakeABI()
 	if err != nil {
 		return nil, err
 	}
