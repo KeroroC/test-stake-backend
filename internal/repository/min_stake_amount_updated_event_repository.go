@@ -4,16 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"test-stake-backend/internal/models"
 
 	"gorm.io/gorm"
-)
-
-const (
-	defaultMinStakeAmountUpdatedEventPage     = 1
-	defaultMinStakeAmountUpdatedEventPageSize = 20
-	maxMinStakeAmountUpdatedEventPageSize     = 100
 )
 
 var (
@@ -34,13 +27,7 @@ func NewMinStakeAmountUpdatedEventRepository(db *gorm.DB) (*MinStakeAmountUpdate
 }
 
 type MinStakeAmountUpdatedEventQuery struct {
-	ID              int64
-	ContractAddress string
-	TxHash          string
-	BlockNumberFrom *uint64
-	BlockNumberTo   *uint64
-	Page            int
-	PageSize        int
+	BaseQuery
 }
 
 func (r *MinStakeAmountUpdatedEventRepository) GetByID(ctx context.Context, id int64) (*models.MinStakeAmountUpdatedEvent, error) {
@@ -64,8 +51,8 @@ func (r *MinStakeAmountUpdatedEventRepository) List(ctx context.Context, query M
 		return nil, 0, err
 	}
 
-	page, pageSize := normalizeMinStakeAmountUpdatedEventPagination(query.Page, query.PageSize)
-	db := r.applyQuery(r.db.WithContext(ctx).Model(&models.MinStakeAmountUpdatedEvent{}), query)
+	page, pageSize := normalizePagination(query.Page, query.PageSize)
+	db := applyBaseQuery(r.db.WithContext(ctx).Model(&models.MinStakeAmountUpdatedEvent{}), query.BaseQuery)
 
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
@@ -91,7 +78,7 @@ func (r *MinStakeAmountUpdatedEventRepository) Create(ctx context.Context, event
 	if err := validateMinStakeAmountUpdatedEvent(*event); err != nil {
 		return err
 	}
-	normalizeMinStakeAmountUpdatedEvent(event)
+	normalizeStrings(&event.ContractAddress, &event.TxHash, &event.BlockHash)
 
 	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
 		return fmt.Errorf("create min stake amount updated event tx_hash=%s log_index=%d: %w", event.TxHash, event.LogIndex, err)
@@ -100,54 +87,21 @@ func (r *MinStakeAmountUpdatedEventRepository) Create(ctx context.Context, event
 	return nil
 }
 
-func (r *MinStakeAmountUpdatedEventRepository) applyQuery(db *gorm.DB, query MinStakeAmountUpdatedEventQuery) *gorm.DB {
-	if query.ID > 0 {
-		db = db.Where("id = ?", query.ID)
-	}
-	if query.ContractAddress != "" {
-		db = db.Where("contract_address = ?", strings.ToLower(query.ContractAddress))
-	}
-	if query.TxHash != "" {
-		db = db.Where("tx_hash = ?", strings.ToLower(query.TxHash))
-	}
-	if query.BlockNumberFrom != nil {
-		db = db.Where("block_number >= ?", *query.BlockNumberFrom)
-	}
-	if query.BlockNumberTo != nil {
-		db = db.Where("block_number <= ?", *query.BlockNumberTo)
-	}
-
-	return db
-}
-
-func normalizeMinStakeAmountUpdatedEventPagination(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultMinStakeAmountUpdatedEventPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultMinStakeAmountUpdatedEventPageSize
-	}
-	if pageSize > maxMinStakeAmountUpdatedEventPageSize {
-		pageSize = maxMinStakeAmountUpdatedEventPageSize
-	}
-
-	return page, pageSize
-}
-
 func validateMinStakeAmountUpdatedEvent(event models.MinStakeAmountUpdatedEvent) error {
-	if err := validateAddress("contract_address", event.ContractAddress); err != nil {
+	s := ErrInvalidMinStakeAmountUpdatedEvent
+	if err := validateAddress(s, "contract_address", event.ContractAddress); err != nil {
 		return err
 	}
-	if err := validateUint256Amount(event.OldAmount); err != nil {
+	if err := validateUint256Amount(s, event.OldAmount); err != nil {
 		return err
 	}
-	if err := validateUint256Amount(event.NewAmount); err != nil {
+	if err := validateUint256Amount(s, event.NewAmount); err != nil {
 		return err
 	}
-	if err := validateHash("tx_hash", event.TxHash); err != nil {
+	if err := validateHash(s, "tx_hash", event.TxHash); err != nil {
 		return err
 	}
-	if err := validateHash("block_hash", event.BlockHash); err != nil {
+	if err := validateHash(s, "block_hash", event.BlockHash); err != nil {
 		return err
 	}
 
@@ -155,28 +109,5 @@ func validateMinStakeAmountUpdatedEvent(event models.MinStakeAmountUpdatedEvent)
 }
 
 func validateMinStakeAmountUpdatedEventQuery(query MinStakeAmountUpdatedEventQuery) error {
-	if query.ID < 0 {
-		return fmt.Errorf("%w: id must not be negative", ErrInvalidMinStakeAmountUpdatedEvent)
-	}
-	if query.ContractAddress != "" {
-		if err := validateAddress("contract_address", query.ContractAddress); err != nil {
-			return err
-		}
-	}
-	if query.TxHash != "" {
-		if err := validateHash("tx_hash", query.TxHash); err != nil {
-			return err
-		}
-	}
-	if query.BlockNumberFrom != nil && query.BlockNumberTo != nil && *query.BlockNumberFrom > *query.BlockNumberTo {
-		return fmt.Errorf("%w: block_number_from must not be greater than block_number_to", ErrInvalidMinStakeAmountUpdatedEvent)
-	}
-
-	return nil
-}
-
-func normalizeMinStakeAmountUpdatedEvent(event *models.MinStakeAmountUpdatedEvent) {
-	event.ContractAddress = strings.ToLower(event.ContractAddress)
-	event.TxHash = strings.ToLower(event.TxHash)
-	event.BlockHash = strings.ToLower(event.BlockHash)
+	return validateBaseQuery(ErrInvalidMinStakeAmountUpdatedEvent, query.BaseQuery)
 }

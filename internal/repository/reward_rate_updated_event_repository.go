@@ -4,16 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"test-stake-backend/internal/models"
 
 	"gorm.io/gorm"
-)
-
-const (
-	defaultRewardRateUpdatedEventPage     = 1
-	defaultRewardRateUpdatedEventPageSize = 20
-	maxRewardRateUpdatedEventPageSize     = 100
 )
 
 var (
@@ -34,13 +27,7 @@ func NewRewardRateUpdatedEventRepository(db *gorm.DB) (*RewardRateUpdatedEventRe
 }
 
 type RewardRateUpdatedEventQuery struct {
-	ID              int64
-	ContractAddress string
-	TxHash          string
-	BlockNumberFrom *uint64
-	BlockNumberTo   *uint64
-	Page            int
-	PageSize        int
+	BaseQuery
 }
 
 func (r *RewardRateUpdatedEventRepository) GetByID(ctx context.Context, id int64) (*models.RewardRateUpdatedEvent, error) {
@@ -64,8 +51,8 @@ func (r *RewardRateUpdatedEventRepository) List(ctx context.Context, query Rewar
 		return nil, 0, err
 	}
 
-	page, pageSize := normalizeRewardRateUpdatedEventPagination(query.Page, query.PageSize)
-	db := r.applyQuery(r.db.WithContext(ctx).Model(&models.RewardRateUpdatedEvent{}), query)
+	page, pageSize := normalizePagination(query.Page, query.PageSize)
+	db := applyBaseQuery(r.db.WithContext(ctx).Model(&models.RewardRateUpdatedEvent{}), query.BaseQuery)
 
 	var total int64
 	if err := db.Count(&total).Error; err != nil {
@@ -91,7 +78,7 @@ func (r *RewardRateUpdatedEventRepository) Create(ctx context.Context, event *mo
 	if err := validateRewardRateUpdatedEvent(*event); err != nil {
 		return err
 	}
-	normalizeRewardRateUpdatedEvent(event)
+	normalizeStrings(&event.ContractAddress, &event.TxHash, &event.BlockHash)
 
 	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
 		return fmt.Errorf("create reward rate updated event tx_hash=%s log_index=%d: %w", event.TxHash, event.LogIndex, err)
@@ -100,54 +87,21 @@ func (r *RewardRateUpdatedEventRepository) Create(ctx context.Context, event *mo
 	return nil
 }
 
-func (r *RewardRateUpdatedEventRepository) applyQuery(db *gorm.DB, query RewardRateUpdatedEventQuery) *gorm.DB {
-	if query.ID > 0 {
-		db = db.Where("id = ?", query.ID)
-	}
-	if query.ContractAddress != "" {
-		db = db.Where("contract_address = ?", strings.ToLower(query.ContractAddress))
-	}
-	if query.TxHash != "" {
-		db = db.Where("tx_hash = ?", strings.ToLower(query.TxHash))
-	}
-	if query.BlockNumberFrom != nil {
-		db = db.Where("block_number >= ?", *query.BlockNumberFrom)
-	}
-	if query.BlockNumberTo != nil {
-		db = db.Where("block_number <= ?", *query.BlockNumberTo)
-	}
-
-	return db
-}
-
-func normalizeRewardRateUpdatedEventPagination(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultRewardRateUpdatedEventPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultRewardRateUpdatedEventPageSize
-	}
-	if pageSize > maxRewardRateUpdatedEventPageSize {
-		pageSize = maxRewardRateUpdatedEventPageSize
-	}
-
-	return page, pageSize
-}
-
 func validateRewardRateUpdatedEvent(event models.RewardRateUpdatedEvent) error {
-	if err := validateAddress("contract_address", event.ContractAddress); err != nil {
+	s := ErrInvalidRewardRateUpdatedEvent
+	if err := validateAddress(s, "contract_address", event.ContractAddress); err != nil {
 		return err
 	}
-	if err := validateUint256Amount(event.OldRate); err != nil {
+	if err := validateUint256Amount(s, event.OldRate); err != nil {
 		return err
 	}
-	if err := validateUint256Amount(event.NewRate); err != nil {
+	if err := validateUint256Amount(s, event.NewRate); err != nil {
 		return err
 	}
-	if err := validateHash("tx_hash", event.TxHash); err != nil {
+	if err := validateHash(s, "tx_hash", event.TxHash); err != nil {
 		return err
 	}
-	if err := validateHash("block_hash", event.BlockHash); err != nil {
+	if err := validateHash(s, "block_hash", event.BlockHash); err != nil {
 		return err
 	}
 
@@ -155,28 +109,5 @@ func validateRewardRateUpdatedEvent(event models.RewardRateUpdatedEvent) error {
 }
 
 func validateRewardRateUpdatedEventQuery(query RewardRateUpdatedEventQuery) error {
-	if query.ID < 0 {
-		return fmt.Errorf("%w: id must not be negative", ErrInvalidRewardRateUpdatedEvent)
-	}
-	if query.ContractAddress != "" {
-		if err := validateAddress("contract_address", query.ContractAddress); err != nil {
-			return err
-		}
-	}
-	if query.TxHash != "" {
-		if err := validateHash("tx_hash", query.TxHash); err != nil {
-			return err
-		}
-	}
-	if query.BlockNumberFrom != nil && query.BlockNumberTo != nil && *query.BlockNumberFrom > *query.BlockNumberTo {
-		return fmt.Errorf("%w: block_number_from must not be greater than block_number_to", ErrInvalidRewardRateUpdatedEvent)
-	}
-
-	return nil
-}
-
-func normalizeRewardRateUpdatedEvent(event *models.RewardRateUpdatedEvent) {
-	event.ContractAddress = strings.ToLower(event.ContractAddress)
-	event.TxHash = strings.ToLower(event.TxHash)
-	event.BlockHash = strings.ToLower(event.BlockHash)
+	return validateBaseQuery(ErrInvalidRewardRateUpdatedEvent, query.BaseQuery)
 }

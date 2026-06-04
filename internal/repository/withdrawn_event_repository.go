@@ -10,12 +10,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	defaultWithdrawnEventPage     = 1
-	defaultWithdrawnEventPageSize = 20
-	maxWithdrawnEventPageSize     = 100
-)
-
 var (
 	ErrInvalidWithdrawnEvent  = errors.New("invalid withdrawn event")
 	ErrWithdrawnEventNotFound = errors.New("withdrawn event not found")
@@ -34,14 +28,8 @@ func NewWithdrawnEventRepository(db *gorm.DB) (*WithdrawnEventRepository, error)
 }
 
 type WithdrawnEventQuery struct {
-	ID              int64
-	ContractAddress string
-	User            string
-	TxHash          string
-	BlockNumberFrom *uint64
-	BlockNumberTo   *uint64
-	Page            int
-	PageSize        int
+	BaseQuery
+	User string
 }
 
 func (r *WithdrawnEventRepository) GetByID(ctx context.Context, id int64) (*models.WithdrawnEvent, error) {
@@ -65,7 +53,7 @@ func (r *WithdrawnEventRepository) List(ctx context.Context, query WithdrawnEven
 		return nil, 0, err
 	}
 
-	page, pageSize := normalizeWithdrawnEventPagination(query.Page, query.PageSize)
+	page, pageSize := normalizePagination(query.Page, query.PageSize)
 	db := r.applyQuery(r.db.WithContext(ctx).Model(&models.WithdrawnEvent{}), query)
 
 	var total int64
@@ -92,7 +80,7 @@ func (r *WithdrawnEventRepository) Create(ctx context.Context, event *models.Wit
 	if err := validateWithdrawnEvent(*event); err != nil {
 		return err
 	}
-	normalizeWithdrawnEvent(event)
+	normalizeStrings(&event.ContractAddress, &event.User, &event.TxHash, &event.BlockHash)
 
 	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
 		return fmt.Errorf("create withdrawn event tx_hash=%s log_index=%d: %w", event.TxHash, event.LogIndex, err)
@@ -102,56 +90,29 @@ func (r *WithdrawnEventRepository) Create(ctx context.Context, event *models.Wit
 }
 
 func (r *WithdrawnEventRepository) applyQuery(db *gorm.DB, query WithdrawnEventQuery) *gorm.DB {
-	if query.ID > 0 {
-		db = db.Where("id = ?", query.ID)
-	}
-	if query.ContractAddress != "" {
-		db = db.Where("contract_address = ?", strings.ToLower(query.ContractAddress))
-	}
+	db = applyBaseQuery(db, query.BaseQuery)
 	if query.User != "" {
 		db = db.Where("user = ?", strings.ToLower(query.User))
-	}
-	if query.TxHash != "" {
-		db = db.Where("tx_hash = ?", strings.ToLower(query.TxHash))
-	}
-	if query.BlockNumberFrom != nil {
-		db = db.Where("block_number >= ?", *query.BlockNumberFrom)
-	}
-	if query.BlockNumberTo != nil {
-		db = db.Where("block_number <= ?", *query.BlockNumberTo)
 	}
 
 	return db
 }
 
-func normalizeWithdrawnEventPagination(page, pageSize int) (int, int) {
-	if page <= 0 {
-		page = defaultWithdrawnEventPage
-	}
-	if pageSize <= 0 {
-		pageSize = defaultWithdrawnEventPageSize
-	}
-	if pageSize > maxWithdrawnEventPageSize {
-		pageSize = maxWithdrawnEventPageSize
-	}
-
-	return page, pageSize
-}
-
 func validateWithdrawnEvent(event models.WithdrawnEvent) error {
-	if err := validateAddress("contract_address", event.ContractAddress); err != nil {
+	s := ErrInvalidWithdrawnEvent
+	if err := validateAddress(s, "contract_address", event.ContractAddress); err != nil {
 		return err
 	}
-	if err := validateAddress("user", event.User); err != nil {
+	if err := validateAddress(s, "user", event.User); err != nil {
 		return err
 	}
-	if err := validateUint256Amount(event.Amount); err != nil {
+	if err := validateUint256Amount(s, event.Amount); err != nil {
 		return err
 	}
-	if err := validateHash("tx_hash", event.TxHash); err != nil {
+	if err := validateHash(s, "tx_hash", event.TxHash); err != nil {
 		return err
 	}
-	if err := validateHash("block_hash", event.BlockHash); err != nil {
+	if err := validateHash(s, "block_hash", event.BlockHash); err != nil {
 		return err
 	}
 
@@ -159,34 +120,14 @@ func validateWithdrawnEvent(event models.WithdrawnEvent) error {
 }
 
 func validateWithdrawnEventQuery(query WithdrawnEventQuery) error {
-	if query.ID < 0 {
-		return fmt.Errorf("%w: id must not be negative", ErrInvalidWithdrawnEvent)
-	}
-	if query.ContractAddress != "" {
-		if err := validateAddress("contract_address", query.ContractAddress); err != nil {
-			return err
-		}
+	if err := validateBaseQuery(ErrInvalidWithdrawnEvent, query.BaseQuery); err != nil {
+		return err
 	}
 	if query.User != "" {
-		if err := validateAddress("user", query.User); err != nil {
+		if err := validateAddress(ErrInvalidWithdrawnEvent, "user", query.User); err != nil {
 			return err
 		}
-	}
-	if query.TxHash != "" {
-		if err := validateHash("tx_hash", query.TxHash); err != nil {
-			return err
-		}
-	}
-	if query.BlockNumberFrom != nil && query.BlockNumberTo != nil && *query.BlockNumberFrom > *query.BlockNumberTo {
-		return fmt.Errorf("%w: block_number_from must not be greater than block_number_to", ErrInvalidWithdrawnEvent)
 	}
 
 	return nil
-}
-
-func normalizeWithdrawnEvent(event *models.WithdrawnEvent) {
-	event.ContractAddress = strings.ToLower(event.ContractAddress)
-	event.User = strings.ToLower(event.User)
-	event.TxHash = strings.ToLower(event.TxHash)
-	event.BlockHash = strings.ToLower(event.BlockHash)
 }
