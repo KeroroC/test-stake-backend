@@ -83,6 +83,9 @@ func (r *RewardClaimedEventRepository) Create(ctx context.Context, event *models
 	normalizeStrings(&event.ContractAddress, &event.User, &event.TxHash, &event.BlockHash)
 
 	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
+		if isDuplicateKeyError(err) {
+			return nil
+		}
 		return fmt.Errorf("create reward claimed event tx_hash=%s log_index=%d: %w", event.TxHash, event.LogIndex, err)
 	}
 

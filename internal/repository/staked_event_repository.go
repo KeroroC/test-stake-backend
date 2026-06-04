@@ -83,6 +83,9 @@ func (r *StakedEventRepository) Create(ctx context.Context, event *models.Staked
 	normalizeStrings(&event.ContractAddress, &event.User, &event.TxHash, &event.BlockHash)
 
 	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
+		if isDuplicateKeyError(err) {
+			return nil
+		}
 		return fmt.Errorf("create staked event tx_hash=%s log_index=%d: %w", event.TxHash, event.LogIndex, err)
 	}
 

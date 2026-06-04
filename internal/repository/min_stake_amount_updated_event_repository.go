@@ -81,6 +81,9 @@ func (r *MinStakeAmountUpdatedEventRepository) Create(ctx context.Context, event
 	normalizeStrings(&event.ContractAddress, &event.TxHash, &event.BlockHash)
 
 	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
+		if isDuplicateKeyError(err) {
+			return nil
+		}
 		return fmt.Errorf("create min stake amount updated event tx_hash=%s log_index=%d: %w", event.TxHash, event.LogIndex, err)
 	}
 

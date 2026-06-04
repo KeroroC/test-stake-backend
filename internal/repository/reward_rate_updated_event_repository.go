@@ -81,6 +81,9 @@ func (r *RewardRateUpdatedEventRepository) Create(ctx context.Context, event *mo
 	normalizeStrings(&event.ContractAddress, &event.TxHash, &event.BlockHash)
 
 	if err := r.db.WithContext(ctx).Create(event).Error; err != nil {
+		if isDuplicateKeyError(err) {
+			return nil
+		}
 		return fmt.Errorf("create reward rate updated event tx_hash=%s log_index=%d: %w", event.TxHash, event.LogIndex, err)
 	}
 

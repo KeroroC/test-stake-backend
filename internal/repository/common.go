@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -137,4 +138,9 @@ func normalizeStrings(ptrs ...*string) {
 	for _, p := range ptrs {
 		*p = strings.ToLower(*p)
 	}
+}
+
+// isDuplicateKeyError 判断是否为重复键错误（幂等场景直接忽略）。
+func isDuplicateKeyError(err error) bool {
+	return errors.Is(err, gorm.ErrDuplicatedKey)
 }
