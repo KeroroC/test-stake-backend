@@ -9,22 +9,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type StakedEventHandler struct {
-	service *service.StakedEventService
+type MinStakeAmountUpdatedEventHandler struct {
+	service *service.MinStakeAmountUpdatedEventService
 }
 
-func NewStakedEventHandler(service *service.StakedEventService) *StakedEventHandler {
-	return &StakedEventHandler{service: service}
+func NewMinStakeAmountUpdatedEventHandler(service *service.MinStakeAmountUpdatedEventService) *MinStakeAmountUpdatedEventHandler {
+	return &MinStakeAmountUpdatedEventHandler{service: service}
 }
 
-func (h *StakedEventHandler) Register(r gin.IRouter) {
-	group := r.Group("/staked-events")
+func (h *MinStakeAmountUpdatedEventHandler) Register(r gin.IRouter) {
+	group := r.Group("/min-stake-amount-updated-events")
 	group.GET("", h.List)
 	group.GET("/:id", h.GetByID)
 }
 
-func (h *StakedEventHandler) List(c *gin.Context) {
-	query, err := parseStakedEventQuery(c)
+func (h *MinStakeAmountUpdatedEventHandler) List(c *gin.Context) {
+	query, err := parseMinStakeAmountUpdatedEventQuery(c)
 	if err != nil {
 		respondError(c, http.StatusBadRequest, err.Error())
 		return
@@ -39,7 +39,7 @@ func (h *StakedEventHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-func (h *StakedEventHandler) GetByID(c *gin.Context) {
+func (h *MinStakeAmountUpdatedEventHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id <= 0 {
 		respondError(c, http.StatusBadRequest, "id must be a positive integer")
@@ -55,8 +55,8 @@ func (h *StakedEventHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, event)
 }
 
-func parseStakedEventQuery(c *gin.Context) (repository.StakedEventQuery, error) {
-	var query repository.StakedEventQuery
+func parseMinStakeAmountUpdatedEventQuery(c *gin.Context) (repository.MinStakeAmountUpdatedEventQuery, error) {
+	var query repository.MinStakeAmountUpdatedEventQuery
 	var err error
 
 	query.ID, err = parseOptionalInt64(c, "id")
@@ -64,7 +64,6 @@ func parseStakedEventQuery(c *gin.Context) (repository.StakedEventQuery, error) 
 		return query, err
 	}
 	query.ContractAddress = c.Query("contract_address")
-	query.User = c.Query("user")
 	query.TxHash = c.Query("tx_hash")
 	query.BlockNumberFrom, err = parseOptionalUint64Pointer(c, "block_number_from")
 	if err != nil {

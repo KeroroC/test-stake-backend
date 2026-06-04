@@ -10,10 +10,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// RegisterRoutes 注册所有 HTTP 路由。
 func RegisterRoutes(r *gin.Engine, db *gorm.DB) error {
 	r.GET("/health", healthHandler)
 
+	// StakedEvent
 	stakedEventRepo, err := repository.NewStakedEventRepository(db)
 	if err != nil {
 		return fmt.Errorf("register staked event repository: %w", err)
@@ -24,10 +24,53 @@ func RegisterRoutes(r *gin.Engine, db *gorm.DB) error {
 	}
 	NewStakedEventHandler(stakedEventService).Register(r)
 
+	// RewardClaimedEvent
+	rewardClaimedEventRepo, err := repository.NewRewardClaimedEventRepository(db)
+	if err != nil {
+		return fmt.Errorf("register reward claimed event repository: %w", err)
+	}
+	rewardClaimedEventService, err := service.NewRewardClaimedEventService(rewardClaimedEventRepo)
+	if err != nil {
+		return fmt.Errorf("register reward claimed event service: %w", err)
+	}
+	NewRewardClaimedEventHandler(rewardClaimedEventService).Register(r)
+
+	// WithdrawnEvent
+	withdrawnEventRepo, err := repository.NewWithdrawnEventRepository(db)
+	if err != nil {
+		return fmt.Errorf("register withdrawn event repository: %w", err)
+	}
+	withdrawnEventService, err := service.NewWithdrawnEventService(withdrawnEventRepo)
+	if err != nil {
+		return fmt.Errorf("register withdrawn event service: %w", err)
+	}
+	NewWithdrawnEventHandler(withdrawnEventService).Register(r)
+
+	// MinStakeAmountUpdatedEvent
+	minStakeAmountUpdatedEventRepo, err := repository.NewMinStakeAmountUpdatedEventRepository(db)
+	if err != nil {
+		return fmt.Errorf("register min stake amount updated event repository: %w", err)
+	}
+	minStakeAmountUpdatedEventService, err := service.NewMinStakeAmountUpdatedEventService(minStakeAmountUpdatedEventRepo)
+	if err != nil {
+		return fmt.Errorf("register min stake amount updated event service: %w", err)
+	}
+	NewMinStakeAmountUpdatedEventHandler(minStakeAmountUpdatedEventService).Register(r)
+
+	// RewardRateUpdatedEvent
+	rewardRateUpdatedEventRepo, err := repository.NewRewardRateUpdatedEventRepository(db)
+	if err != nil {
+		return fmt.Errorf("register reward rate updated event repository: %w", err)
+	}
+	rewardRateUpdatedEventService, err := service.NewRewardRateUpdatedEventService(rewardRateUpdatedEventRepo)
+	if err != nil {
+		return fmt.Errorf("register reward rate updated event service: %w", err)
+	}
+	NewRewardRateUpdatedEventHandler(rewardRateUpdatedEventService).Register(r)
+
 	return nil
 }
 
-// healthHandler 健康检查
 func healthHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status": "ok",

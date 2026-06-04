@@ -9,22 +9,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type StakedEventHandler struct {
-	service *service.StakedEventService
+type RewardClaimedEventHandler struct {
+	service *service.RewardClaimedEventService
 }
 
-func NewStakedEventHandler(service *service.StakedEventService) *StakedEventHandler {
-	return &StakedEventHandler{service: service}
+func NewRewardClaimedEventHandler(service *service.RewardClaimedEventService) *RewardClaimedEventHandler {
+	return &RewardClaimedEventHandler{service: service}
 }
 
-func (h *StakedEventHandler) Register(r gin.IRouter) {
-	group := r.Group("/staked-events")
+func (h *RewardClaimedEventHandler) Register(r gin.IRouter) {
+	group := r.Group("/reward-claimed-events")
 	group.GET("", h.List)
 	group.GET("/:id", h.GetByID)
 }
 
-func (h *StakedEventHandler) List(c *gin.Context) {
-	query, err := parseStakedEventQuery(c)
+func (h *RewardClaimedEventHandler) List(c *gin.Context) {
+	query, err := parseRewardClaimedEventQuery(c)
 	if err != nil {
 		respondError(c, http.StatusBadRequest, err.Error())
 		return
@@ -39,7 +39,7 @@ func (h *StakedEventHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
-func (h *StakedEventHandler) GetByID(c *gin.Context) {
+func (h *RewardClaimedEventHandler) GetByID(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id <= 0 {
 		respondError(c, http.StatusBadRequest, "id must be a positive integer")
@@ -55,8 +55,8 @@ func (h *StakedEventHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, event)
 }
 
-func parseStakedEventQuery(c *gin.Context) (repository.StakedEventQuery, error) {
-	var query repository.StakedEventQuery
+func parseRewardClaimedEventQuery(c *gin.Context) (repository.RewardClaimedEventQuery, error) {
+	var query repository.RewardClaimedEventQuery
 	var err error
 
 	query.ID, err = parseOptionalInt64(c, "id")
