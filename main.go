@@ -6,7 +6,9 @@ import (
 	"log"
 	"test-stake-backend/internal/api"
 	"test-stake-backend/internal/config"
+	"test-stake-backend/internal/listener"
 	"test-stake-backend/internal/models"
+	"test-stake-backend/internal/repository"
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -62,6 +64,23 @@ func main() {
 		log.Fatalf("Failed to conncect ETH client: %v", err)
 	}
 	defer rpcClient.Close()
+
+	stakedEventRepo, err := repository.NewStakedEventRepository(db)
+	if err != nil {
+		log.Fatalf("Failed to create staked event repository: %v", err)
+	}
+	contractEventListener, err := listener.NewContractEventListener(cfg.ETHConfig.WSUrl, cfg.ETHConfig.StakeAddress)
+	if err != nil {
+		log.Fatalf("Failed to create contract event listener: %v", err)
+	}
+	stakedEventHandler, err := listener.NewStakedEventLogHandler(stakedEventRepo)
+	if err != nil {
+		log.Fatalf("Failed to create staked event handler: %v", err)
+	}
+	if err := contractEventListener.Register(stakedEventHandler); err != nil {
+		log.Fatalf("Failed to register staked event handler: %v", err)
+	}
+	go contractEventListener.Start(context.Background())
 
 	// 启动gin
 	if cfg.Server.Mode == "release" {
