@@ -108,8 +108,8 @@ func validateUint256Amount(sentinel error, value string) error {
 	if !ok {
 		return fmt.Errorf("%w: amount must be a decimal uint256 string", sentinel)
 	}
-	if amount.Sign() <= 0 {
-		return fmt.Errorf("%w: amount must be greater than 0", sentinel)
+	if amount.Sign() < 0 {
+		return fmt.Errorf("%w: amount must not be negative", sentinel)
 	}
 	if amount.BitLen() > 256 {
 		return fmt.Errorf("%w: amount exceeds uint256", sentinel)
