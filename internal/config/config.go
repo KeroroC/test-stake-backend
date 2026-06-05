@@ -31,6 +31,7 @@ type Redis struct {
 	Addr     string `mapstructure:"addr"`
 	Password string `mapstructure:"password"`
 	DB       int    `mapstructure:"db"`
+	CacheTTL int    `mapstructure:"cache_ttl"` // 缓存过期时间（秒），默认 60
 }
 
 type ETHConfig struct {

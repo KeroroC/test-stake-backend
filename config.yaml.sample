@@ -13,6 +13,7 @@ redis:
   addr: localhost:3306
   password: 123
   db: 0
+  cache_ttl: 60
 eth:
   rpc_url: https://sepolia.infura.io/v3/XXX
   ws_url: wss://sepolia.infura.io/ws/v3/XXX
