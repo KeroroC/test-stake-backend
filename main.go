@@ -68,6 +68,12 @@ func main() {
 		}
 	}(redisClient)
 
+	// 计算缓存 TTL
+	cacheTTL := time.Duration(cfg.Redis.CacheTTL) * time.Second
+	if cacheTTL <= 0 {
+		cacheTTL = 60 * time.Second
+	}
+
 	// 4.初始化eth连接
 	rpcClient, err := ethclient.DialContext(ctx, cfg.ETHConfig.RPCUrl)
 	if err != nil {
@@ -107,19 +113,19 @@ func main() {
 	}
 	for _, newHandler := range []func() (listener.ContractEventHandler, error){
 		func() (listener.ContractEventHandler, error) {
-			return listener.NewStakedEventLogHandler(stakedEventRepo)
+			return listener.NewStakedEventLogHandler(stakedEventRepo, redisClient)
 		},
 		func() (listener.ContractEventHandler, error) {
-			return listener.NewRewardClaimedEventLogHandler(rewardClaimedEventRepo)
+			return listener.NewRewardClaimedEventLogHandler(rewardClaimedEventRepo, redisClient)
 		},
 		func() (listener.ContractEventHandler, error) {
-			return listener.NewWithdrawnEventLogHandler(withdrawnEventRepo)
+			return listener.NewWithdrawnEventLogHandler(withdrawnEventRepo, redisClient)
 		},
 		func() (listener.ContractEventHandler, error) {
-			return listener.NewMinStakeAmountUpdatedEventLogHandler(minStakeAmountUpdatedEventRepo)
+			return listener.NewMinStakeAmountUpdatedEventLogHandler(minStakeAmountUpdatedEventRepo, redisClient)
 		},
 		func() (listener.ContractEventHandler, error) {
-			return listener.NewRewardRateUpdatedEventLogHandler(rewardRateUpdatedEventRepo)
+			return listener.NewRewardRateUpdatedEventLogHandler(rewardRateUpdatedEventRepo, redisClient)
 		},
 	} {
 		h, err := newHandler()
@@ -137,7 +143,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
-	if err := api.RegisterRoutes(r, db); err != nil {
+	if err := api.RegisterRoutes(r, db, redisClient, cacheTTL); err != nil {
 		log.Fatalf("Failed to register routes: %v", err)
 	}
 
