@@ -7,25 +7,26 @@ import (
 	"math/big"
 
 	pkgabi "test-stake-backend/internal/abi"
+	"test-stake-backend/internal/cache"
 	"test-stake-backend/internal/models"
 	"test-stake-backend/internal/repository"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/redis/go-redis/v9"
 )
 
-const (
-	rewardClaimedEventName = "RewardClaimed"
-)
+const rewardClaimedEventName = "RewardClaimed"
 
 type RewardClaimedEventLogHandler struct {
-	repo              *repository.RewardClaimedEventRepository
-	contractABI       abi.ABI
+	repo                 *repository.RewardClaimedEventRepository
+	rdb                  *redis.Client
+	contractABI          abi.ABI
 	rewardClaimedEventID common.Hash
 }
 
-func NewRewardClaimedEventLogHandler(repo *repository.RewardClaimedEventRepository) (*RewardClaimedEventLogHandler, error) {
+func NewRewardClaimedEventLogHandler(repo *repository.RewardClaimedEventRepository, rdb *redis.Client) (*RewardClaimedEventLogHandler, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("create reward claimed event handler: repository is nil")
 	}
@@ -41,6 +42,7 @@ func NewRewardClaimedEventLogHandler(repo *repository.RewardClaimedEventReposito
 
 	return &RewardClaimedEventLogHandler{
 		repo:                 repo,
+		rdb:                  rdb,
 		contractABI:          contractABI,
 		rewardClaimedEventID: rewardClaimedEvent.ID,
 	}, nil
@@ -61,6 +63,10 @@ func (h *RewardClaimedEventLogHandler) Handle(ctx context.Context, eventLog type
 	}
 	if err := h.repo.Create(ctx, event); err != nil {
 		return err
+	}
+
+	if err := cache.DeleteByPrefix(ctx, h.rdb, "reward-claimed:list:"); err != nil {
+		log.Printf("cache delete reward-claimed list prefix: %v", err)
 	}
 
 	log.Printf("reward claimed event inserted: tx=%s index=%d user=%s amount=%s", event.TxHash, event.LogIndex, event.User, event.Amount)
@@ -95,4 +101,3 @@ func (h *RewardClaimedEventLogHandler) parseLog(eventLog types.Log) (*models.Rew
 		BlockHash:       eventLog.BlockHash.Hex(),
 	}, nil
 }
-

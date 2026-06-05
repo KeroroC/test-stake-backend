@@ -7,25 +7,26 @@ import (
 	"math/big"
 
 	pkgabi "test-stake-backend/internal/abi"
+	"test-stake-backend/internal/cache"
 	"test-stake-backend/internal/models"
 	"test-stake-backend/internal/repository"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/redis/go-redis/v9"
 )
 
 const stakedEventName = "Staked"
 
-// StakedEventLogHandler 解析 Staked 事件并写入数据库。
 type StakedEventLogHandler struct {
 	repo          *repository.StakedEventRepository
+	rdb           *redis.Client
 	contractABI   abi.ABI
 	stakedEventID common.Hash
 }
 
-// NewStakedEventLogHandler 创建 StakedEventLogHandler。
-func NewStakedEventLogHandler(repo *repository.StakedEventRepository) (*StakedEventLogHandler, error) {
+func NewStakedEventLogHandler(repo *repository.StakedEventRepository, rdb *redis.Client) (*StakedEventLogHandler, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("create staked event handler: repository is nil")
 	}
@@ -41,22 +42,20 @@ func NewStakedEventLogHandler(repo *repository.StakedEventRepository) (*StakedEv
 
 	return &StakedEventLogHandler{
 		repo:          repo,
+		rdb:           rdb,
 		contractABI:   contractABI,
 		stakedEventID: stakedEvent.ID,
 	}, nil
 }
 
-// EventName 返回事件名称。
 func (h *StakedEventLogHandler) EventName() string {
 	return stakedEventName
 }
 
-// EventID 返回事件 topic0。
 func (h *StakedEventLogHandler) EventID() common.Hash {
 	return h.stakedEventID
 }
 
-// Handle 解析 Staked 日志并插入数据库。
 func (h *StakedEventLogHandler) Handle(ctx context.Context, eventLog types.Log) error {
 	event, err := h.parseLog(eventLog)
 	if err != nil {
@@ -64,6 +63,10 @@ func (h *StakedEventLogHandler) Handle(ctx context.Context, eventLog types.Log) 
 	}
 	if err := h.repo.Create(ctx, event); err != nil {
 		return err
+	}
+
+	if err := cache.DeleteByPrefix(ctx, h.rdb, "staked:list:"); err != nil {
+		log.Printf("cache delete staked list prefix: %v", err)
 	}
 
 	log.Printf("staked event inserted: tx=%s index=%d user=%s amount=%s", event.TxHash, event.LogIndex, event.User, event.Amount)
@@ -98,4 +101,3 @@ func (h *StakedEventLogHandler) parseLog(eventLog types.Log) (*models.StakedEven
 		BlockHash:       eventLog.BlockHash.Hex(),
 	}, nil
 }
-

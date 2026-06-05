@@ -7,25 +7,26 @@ import (
 	"math/big"
 
 	pkgabi "test-stake-backend/internal/abi"
+	"test-stake-backend/internal/cache"
 	"test-stake-backend/internal/models"
 	"test-stake-backend/internal/repository"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/redis/go-redis/v9"
 )
 
-const (
-	withdrawnEventName = "Withdrawn"
-)
+const withdrawnEventName = "Withdrawn"
 
 type WithdrawnEventLogHandler struct {
-	repo            *repository.WithdrawnEventRepository
-	contractABI     abi.ABI
+	repo             *repository.WithdrawnEventRepository
+	rdb              *redis.Client
+	contractABI      abi.ABI
 	withdrawnEventID common.Hash
 }
 
-func NewWithdrawnEventLogHandler(repo *repository.WithdrawnEventRepository) (*WithdrawnEventLogHandler, error) {
+func NewWithdrawnEventLogHandler(repo *repository.WithdrawnEventRepository, rdb *redis.Client) (*WithdrawnEventLogHandler, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("create withdrawn event handler: repository is nil")
 	}
@@ -41,6 +42,7 @@ func NewWithdrawnEventLogHandler(repo *repository.WithdrawnEventRepository) (*Wi
 
 	return &WithdrawnEventLogHandler{
 		repo:             repo,
+		rdb:              rdb,
 		contractABI:      contractABI,
 		withdrawnEventID: withdrawnEvent.ID,
 	}, nil
@@ -61,6 +63,10 @@ func (h *WithdrawnEventLogHandler) Handle(ctx context.Context, eventLog types.Lo
 	}
 	if err := h.repo.Create(ctx, event); err != nil {
 		return err
+	}
+
+	if err := cache.DeleteByPrefix(ctx, h.rdb, "withdrawn:list:"); err != nil {
+		log.Printf("cache delete withdrawn list prefix: %v", err)
 	}
 
 	log.Printf("withdrawn event inserted: tx=%s index=%d user=%s amount=%s", event.TxHash, event.LogIndex, event.User, event.Amount)

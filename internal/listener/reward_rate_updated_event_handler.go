@@ -7,25 +7,26 @@ import (
 	"math/big"
 
 	pkgabi "test-stake-backend/internal/abi"
+	"test-stake-backend/internal/cache"
 	"test-stake-backend/internal/models"
 	"test-stake-backend/internal/repository"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/redis/go-redis/v9"
 )
 
-const (
-	rewardRateUpdatedEventName = "RewardRateUpdated"
-)
+const rewardRateUpdatedEventName = "RewardRateUpdated"
 
 type RewardRateUpdatedEventLogHandler struct {
-	repo                    *repository.RewardRateUpdatedEventRepository
-	contractABI             abi.ABI
+	repo                     *repository.RewardRateUpdatedEventRepository
+	rdb                      *redis.Client
+	contractABI              abi.ABI
 	rewardRateUpdatedEventID common.Hash
 }
 
-func NewRewardRateUpdatedEventLogHandler(repo *repository.RewardRateUpdatedEventRepository) (*RewardRateUpdatedEventLogHandler, error) {
+func NewRewardRateUpdatedEventLogHandler(repo *repository.RewardRateUpdatedEventRepository, rdb *redis.Client) (*RewardRateUpdatedEventLogHandler, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("create reward rate updated event handler: repository is nil")
 	}
@@ -41,6 +42,7 @@ func NewRewardRateUpdatedEventLogHandler(repo *repository.RewardRateUpdatedEvent
 
 	return &RewardRateUpdatedEventLogHandler{
 		repo:                     repo,
+		rdb:                      rdb,
 		contractABI:              contractABI,
 		rewardRateUpdatedEventID: rewardRateUpdatedEvent.ID,
 	}, nil
@@ -61,6 +63,10 @@ func (h *RewardRateUpdatedEventLogHandler) Handle(ctx context.Context, eventLog 
 	}
 	if err := h.repo.Create(ctx, event); err != nil {
 		return err
+	}
+
+	if err := cache.DeleteByPrefix(ctx, h.rdb, "reward-rate-updated:list:"); err != nil {
+		log.Printf("cache delete reward-rate-updated list prefix: %v", err)
 	}
 
 	log.Printf("reward rate updated event inserted: tx=%s index=%d old_rate=%s new_rate=%s", event.TxHash, event.LogIndex, event.OldRate, event.NewRate)

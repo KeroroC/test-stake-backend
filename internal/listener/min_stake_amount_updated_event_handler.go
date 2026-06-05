@@ -7,25 +7,26 @@ import (
 	"math/big"
 
 	pkgabi "test-stake-backend/internal/abi"
+	"test-stake-backend/internal/cache"
 	"test-stake-backend/internal/models"
 	"test-stake-backend/internal/repository"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/redis/go-redis/v9"
 )
 
-const (
-	minStakeAmountUpdatedEventName = "MinStakeAmountUpdated"
-)
+const minStakeAmountUpdatedEventName = "MinStakeAmountUpdated"
 
 type MinStakeAmountUpdatedEventLogHandler struct {
-	repo                       *repository.MinStakeAmountUpdatedEventRepository
-	contractABI                abi.ABI
+	repo                         *repository.MinStakeAmountUpdatedEventRepository
+	rdb                          *redis.Client
+	contractABI                  abi.ABI
 	minStakeAmountUpdatedEventID common.Hash
 }
 
-func NewMinStakeAmountUpdatedEventLogHandler(repo *repository.MinStakeAmountUpdatedEventRepository) (*MinStakeAmountUpdatedEventLogHandler, error) {
+func NewMinStakeAmountUpdatedEventLogHandler(repo *repository.MinStakeAmountUpdatedEventRepository, rdb *redis.Client) (*MinStakeAmountUpdatedEventLogHandler, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("create min stake amount updated event handler: repository is nil")
 	}
@@ -40,8 +41,9 @@ func NewMinStakeAmountUpdatedEventLogHandler(repo *repository.MinStakeAmountUpda
 	}
 
 	return &MinStakeAmountUpdatedEventLogHandler{
-		repo:                        repo,
-		contractABI:                 contractABI,
+		repo:                         repo,
+		rdb:                          rdb,
+		contractABI:                  contractABI,
 		minStakeAmountUpdatedEventID: minStakeAmountUpdatedEvent.ID,
 	}, nil
 }
@@ -61,6 +63,10 @@ func (h *MinStakeAmountUpdatedEventLogHandler) Handle(ctx context.Context, event
 	}
 	if err := h.repo.Create(ctx, event); err != nil {
 		return err
+	}
+
+	if err := cache.DeleteByPrefix(ctx, h.rdb, "min-stake-amount-updated:list:"); err != nil {
+		log.Printf("cache delete min-stake-amount-updated list prefix: %v", err)
 	}
 
 	log.Printf("min stake amount updated event inserted: tx=%s index=%d old_amount=%s new_amount=%s", event.TxHash, event.LogIndex, event.OldAmount, event.NewAmount)
