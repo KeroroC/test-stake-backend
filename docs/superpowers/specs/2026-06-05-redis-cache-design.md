@@ -1,89 +1,89 @@
-# Redis Query Cache Design
+# Redis 查询缓存设计
 
-## Overview
+## 概述
 
-Add Redis caching to all List query endpoints at the service layer. Uses TTL-based expiration (60s default) with write-through invalidation when new events are persisted.
+在 Service 层为所有 List 查询接口添加 Redis 缓存。采用 TTL 过期（默认 60 秒）+ 写入时主动失效的双重策略。
 
-## Goals
+## 目标
 
-- Reduce database load for repeated List queries
-- Maintain data freshness via TTL + event-driven cache invalidation
-- Minimal code changes, follow existing project conventions
+- 降低重复 List 查询的数据库压力
+- 通过 TTL + 事件驱动的缓存失效保证数据新鲜度
+- 最小化代码改动，遵循现有项目规范
 
-## Scope
+## 范围
 
-- **Cached**: All 5 event type List endpoints (paginated queries)
-- **Not cached**: GetByID (single-row lookup is fast), health endpoint, write operations
+- **缓存**：5 个事件类型的 List 接口（分页查询）
+- **不缓存**：GetByID（单行查询开销小）、health 接口、写入操作
 
-## Architecture
+## 架构
 
 ```
 main.go (redis client)
   └─ api.RegisterRoutes(r, db, redis)
        └─ service.NewXxxService(repo, redis)
             └─ service.List() → cache.Get / cache.Set
-            └─ cache.DeleteByPrefix (on write)
+            └─ cache.DeleteByPrefix（写入时）
 
 listener handler.Handle()
   └─ repo.Create() → cache.DeleteByPrefix(ctx, rdb, "{event}:list:")
 ```
 
-## New File: `internal/cache/cache.go`
+## 新增文件：`internal/cache/cache.go`
 
-Generic cache utility with three functions:
+通用缓存工具，提供以下函数：
 
 ```go
-// Get retrieves and deserializes a cached value. Returns (value, true, nil) on hit.
+// Get 读取并反序列化缓存值。命中时返回 (value, true, nil)。
 func Get[T any](ctx context.Context, rdb *redis.Client, key string) (T, bool, error)
 
-// Set serializes and stores a value with TTL.
+// Set 序列化并存储值，带 TTL。
 func Set(ctx context.Context, rdb *redis.Client, key string, value any, ttl time.Duration) error
 
-// DeleteByPrefix removes all keys matching a prefix using SCAN + DEL.
+// DeleteByPrefix 通过 SCAN + DEL 删除匹配前缀的所有 key。
 func DeleteByPrefix(ctx context.Context, rdb *redis.Client, prefix string) error
 
-// BuildListKey generates a cache key from event type and query parameters.
-// Format: "{eventType}:list:{md5(sorted_params)}"
+// BuildListKey 根据事件类型和查询参数生成缓存 key。
+// 格式："{eventType}:list:{md5(sorted_params)}"
 func BuildListKey(eventType string, query any) string
 ```
 
-`BuildListKey` marshals the query struct to JSON, sorts keys, and takes MD5 hash.
+`BuildListKey` 将 query 结构体序列化为 JSON，排序后取 MD5 哈希。
 
-## Cache Key Format
+## 缓存 Key 格式
 
-| Type | Key Pattern | Example |
-|------|-------------|---------|
+| 类型 | Key 模式 | 示例 |
+|------|----------|------|
 | List | `{eventType}:list:{hash}` | `staked:list:a1b2c3d4...` |
-| Prefix for invalidation | `{eventType}:list:*` | `staked:list:*` |
+| 失效前缀 | `{eventType}:list:*` | `staked:list:*` |
 
-## TTL Configuration
+## TTL 配置
 
-Add `cache_ttl` to `config.yaml` under `redis`:
+在 `config.yaml` 的 `redis` 下新增 `cache_ttl`：
 
 ```yaml
 redis:
   addr: localhost:6379
   password:
   db: 0
-  cache_ttl: 60  # seconds, default 60
+  cache_ttl: 60  # 秒，默认 60
 ```
 
-Update `internal/config/config.go` Redis struct:
+更新 `internal/config/config.go` 的 Redis 结构体：
 
 ```go
 type Redis struct {
     Addr     string `mapstructure:"addr"`
     Password string `mapstructure:"password"`
     DB       int    `mapstructure:"db"`
-    CacheTTL int    `mapstructure:"cache_ttl"` // seconds
+    CacheTTL int    `mapstructure:"cache_ttl"` // 秒
 }
 ```
 
-## Service Layer Changes
+## Service 层改造
 
-Each service gets a `rdb *redis.Client` and `cacheTTL time.Duration` field.
+每个 service 新增 `rdb *redis.Client` 和 `cacheTTL time.Duration` 字段。
 
-Example (`StakedEventService`):
+示例（`StakedEventService`）：
 
 ```go
 type StakedEventService struct {
@@ -95,78 +95,78 @@ type StakedEventService struct {
 func (s *StakedEventService) List(ctx context.Context, query repository.StakedEventQuery) (*StakedEventListResult, error) {
     key := cache.BuildListKey("staked", query)
 
-    // 1. Try cache
+    // 1. 尝试读缓存
     if result, ok, err := cache.Get[StakedEventListResult](ctx, s.rdb, key); err == nil && ok {
         return &result, nil
     }
 
-    // 2. Query DB
+    // 2. 查数据库
     events, total, err := s.repo.List(ctx, query)
     if err != nil {
         return nil, err
     }
     result := &StakedEventListResult{Items: events, Total: total, Page: query.Page, PageSize: query.PageSize}
 
-    // 3. Write cache
+    // 3. 写缓存
     _ = cache.Set(ctx, s.rdb, key, result, s.cacheTTL)
     return result, nil
 }
 ```
 
-Same pattern for all 5 services: `StakedEventService`, `RewardClaimedEventService`, `WithdrawnEventService`, `MinStakeAmountUpdatedEventService`, `RewardRateUpdatedEventService`.
+5 个 service 均按此模式改造：`StakedEventService`、`RewardClaimedEventService`、`WithdrawnEventService`、`MinStakeAmountUpdatedEventService`、`RewardRateUpdatedEventService`。
 
-## Listener Handler Changes
+## Listener Handler 改造
 
-Each listener handler gains a `rdb *redis.Client` field. After successful `repo.Create()`, call:
+每个 listener handler 新增 `rdb *redis.Client` 字段。`repo.Create()` 成功后调用：
 
 ```go
 cache.DeleteByPrefix(ctx, h.rdb, "staked:list:")
 ```
 
-This ensures the next List query sees fresh data.
+确保下次 List 查询能拿到最新数据。
 
-## Wiring Changes
+## 依赖注入改动
 
 ### `main.go`
 
-- Pass `redisClient` to `api.RegisterRoutes(r, db, redisClient)`
-- Pass `redisClient` to each listener handler constructor
+- 将 `redisClient` 传给 `api.RegisterRoutes(r, db, redisClient)`
+- 将 `redisClient` 传给每个 listener handler 的构造函数
 
 ### `internal/api/router.go`
 
-- `RegisterRoutes` signature: `func RegisterRoutes(r *gin.Engine, db *gorm.DB, rdb *redis.Client) error`
-- Pass `rdb` to each `service.NewXxxService(repo, rdb, cacheTTL)`
+- `RegisterRoutes` 签名改为：`func RegisterRoutes(r *gin.Engine, db *gorm.DB, rdb *redis.Client) error`
+- 将 `rdb` 和 `cacheTTL` 传给每个 `service.NewXxxService(repo, rdb, cacheTTL)`
 
-## Files Modified
+## 改动文件清单
 
-| File | Change |
-|------|--------|
-| `internal/cache/cache.go` | **New** — generic cache utility |
-| `internal/cache/cache_test.go` | **New** — unit tests |
-| `internal/config/config.go` | Add `CacheTTL` to Redis struct |
-| `config.yaml` | Add `cache_ttl: 60` |
-| `internal/service/staked_event_service.go` | Add rdb/cacheTTL fields, cache in List |
-| `internal/service/reward_claimed_event_service.go` | Same |
-| `internal/service/withdrawn_event_service.go` | Same |
-| `internal/service/min_stake_amount_updated_event_service.go` | Same |
-| `internal/service/reward_rate_updated_event_service.go` | Same |
-| `internal/listener/staked_event_handler.go` | Add rdb field, delete cache on Create |
-| `internal/listener/reward_claimed_event_handler.go` | Same |
-| `internal/listener/withdrawn_event_handler.go` | Same |
-| `internal/listener/min_stake_amount_updated_event_handler.go` | Same |
-| `internal/listener/reward_rate_updated_event_handler.go` | Same |
-| `internal/api/router.go` | Pass rdb to services |
-| `main.go` | Pass rdb to RegisterRoutes and listener handlers |
+| 文件 | 改动 |
+|------|------|
+| `internal/cache/cache.go` | **新增** — 通用缓存工具 |
+| `internal/cache/cache_test.go` | **新增** — 单元测试 |
+| `internal/config/config.go` | Redis 结构体新增 `CacheTTL` |
+| `config.yaml` | 新增 `cache_ttl: 60` |
+| `internal/service/staked_event_service.go` | 新增 rdb/cacheTTL 字段，List 方法加缓存 |
+| `internal/service/reward_claimed_event_service.go` | 同上 |
+| `internal/service/withdrawn_event_service.go` | 同上 |
+| `internal/service/min_stake_amount_updated_event_service.go` | 同上 |
+| `internal/service/reward_rate_updated_event_service.go` | 同上 |
+| `internal/listener/staked_event_handler.go` | 新增 rdb 字段，Create 后删缓存 |
+| `internal/listener/reward_claimed_event_handler.go` | 同上 |
+| `internal/listener/withdrawn_event_handler.go` | 同上 |
+| `internal/listener/min_stake_amount_updated_event_handler.go` | 同上 |
+| `internal/listener/reward_rate_updated_event_handler.go` | 同上 |
+| `internal/api/router.go` | 传递 rdb 给 service |
+| `main.go` | 传递 rdb 给 RegisterRoutes 和 listener handler |
 
-## Error Handling
+## 错误处理
 
-- Cache read failures: log warning, fall through to DB query (cache is best-effort)
-- Cache write failures: log warning, return DB result (don't fail the request)
-- `DeleteByPrefix` failures: log warning, don't block event processing
-- Redis down: all requests fall through to DB, no impact on correctness
+- 缓存读取失败：打印警告日志，降级查数据库（缓存是尽力而为）
+- 缓存写入失败：打印警告日志，直接返回数据库结果（不影响请求）
+- `DeleteByPrefix` 失败：打印警告日志，不阻塞事件处理
+- Redis 不可用：所有请求降级到数据库，不影响正确性
 
-## Testing
+## 测试
 
-- Unit tests for `cache.BuildListKey` (deterministic hashing)
-- Unit tests for `cache.Get`/`cache.Set`/`cache.DeleteByPrefix` (requires redis or mock)
-- Integration test: List → cache hit → write event → cache invalidated → List returns fresh data
+- `cache.BuildListKey` 单元测试（验证哈希确定性）
+- `cache.Get`/`cache.Set`/`cache.DeleteByPrefix` 单元测试（需要 redis 或 mock）
+- 集成测试：List → 缓存命中 → 写入事件 → 缓存失效 → List 返回最新数据
