@@ -3,8 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
+	"log"
+	"time"
+
+	"test-stake-backend/internal/cache"
 	"test-stake-backend/internal/models"
 	"test-stake-backend/internal/repository"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type MinStakeAmountUpdatedListResult struct {
@@ -15,15 +21,17 @@ type MinStakeAmountUpdatedListResult struct {
 }
 
 type MinStakeAmountUpdatedEventService struct {
-	repo *repository.MinStakeAmountUpdatedEventRepository
+	repo     *repository.MinStakeAmountUpdatedEventRepository
+	rdb      *redis.Client
+	cacheTTL time.Duration
 }
 
-func NewMinStakeAmountUpdatedEventService(repo *repository.MinStakeAmountUpdatedEventRepository) (*MinStakeAmountUpdatedEventService, error) {
+func NewMinStakeAmountUpdatedEventService(repo *repository.MinStakeAmountUpdatedEventRepository, rdb *redis.Client, cacheTTL time.Duration) (*MinStakeAmountUpdatedEventService, error) {
 	if repo == nil {
 		return nil, fmt.Errorf("create min stake amount updated event service: repository is nil")
 	}
 
-	return &MinStakeAmountUpdatedEventService{repo: repo}, nil
+	return &MinStakeAmountUpdatedEventService{repo: repo, rdb: rdb, cacheTTL: cacheTTL}, nil
 }
 
 func (s *MinStakeAmountUpdatedEventService) GetByID(ctx context.Context, id int64) (*models.MinStakeAmountUpdatedEvent, error) {
@@ -31,15 +39,29 @@ func (s *MinStakeAmountUpdatedEventService) GetByID(ctx context.Context, id int6
 }
 
 func (s *MinStakeAmountUpdatedEventService) List(ctx context.Context, query repository.MinStakeAmountUpdatedEventQuery) (*MinStakeAmountUpdatedListResult, error) {
+	key := cache.BuildListKey("min-stake-amount-updated", query)
+
+	if result, ok, err := cache.Get[MinStakeAmountUpdatedListResult](ctx, s.rdb, key); err == nil && ok {
+		return &result, nil
+	} else if err != nil {
+		log.Printf("cache get min-stake-amount-updated list: %v", err)
+	}
+
 	events, total, err := s.repo.List(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 
-	return &MinStakeAmountUpdatedListResult{
+	result := &MinStakeAmountUpdatedListResult{
 		Items:    events,
 		Total:    total,
 		Page:     query.Page,
 		PageSize: query.PageSize,
-	}, nil
+	}
+
+	if err := cache.Set(ctx, s.rdb, key, result, s.cacheTTL); err != nil {
+		log.Printf("cache set min-stake-amount-updated list: %v", err)
+	}
+
+	return result, nil
 }
