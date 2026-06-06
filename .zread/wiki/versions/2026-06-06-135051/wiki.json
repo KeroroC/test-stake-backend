@@ -1,0 +1,197 @@
+{
+  "id": "2026-06-06-135051",
+  "generated_at": "2026-06-06T05:50:51.734375Z",
+  "language": "zh",
+  "pages": [
+    {
+      "slug": "1-xiang-mu-gai-shu",
+      "title": "项目概述",
+      "file": "1-xiang-mu-gai-shu.md",
+      "section": "快速开始",
+      "level": "beginner"
+    },
+    {
+      "slug": "2-kuai-su-shang-shou",
+      "title": "快速上手",
+      "file": "2-kuai-su-shang-shou.md",
+      "section": "快速开始",
+      "level": "beginner"
+    },
+    {
+      "slug": "3-huan-jing-yao-qiu-yu-an-zhuang",
+      "title": "环境要求与安装",
+      "file": "3-huan-jing-yao-qiu-yu-an-zhuang.md",
+      "section": "快速开始",
+      "group": "环境配置",
+      "level": "beginner"
+    },
+    {
+      "slug": "4-pei-zhi-wen-jian-xiang-jie",
+      "title": "配置文件详解",
+      "file": "4-pei-zhi-wen-jian-xiang-jie.md",
+      "section": "快速开始",
+      "group": "环境配置",
+      "level": "beginner"
+    },
+    {
+      "slug": "5-qi-dong-yu-yun-xing-fu-wu",
+      "title": "启动与运行服务",
+      "file": "5-qi-dong-yu-yun-xing-fu-wu.md",
+      "section": "快速开始",
+      "group": "基础使用",
+      "level": "beginner"
+    },
+    {
+      "slug": "6-apijie-kou-ce-shi",
+      "title": "API接口测试",
+      "file": "6-apijie-kou-ce-shi.md",
+      "section": "快速开始",
+      "group": "基础使用",
+      "level": "beginner"
+    },
+    {
+      "slug": "7-si-ceng-jia-gou-she-ji",
+      "title": "四层架构设计",
+      "file": "7-si-ceng-jia-gou-she-ji.md",
+      "section": "深入探索",
+      "group": "核心架构",
+      "level": "intermediate"
+    },
+    {
+      "slug": "8-shi-jian-jian-ting-yu-hui-fang-ji-zhi",
+      "title": "事件监听与回放机制",
+      "file": "8-shi-jian-jian-ting-yu-hui-fang-ji-zhi.md",
+      "section": "深入探索",
+      "group": "核心架构",
+      "level": "intermediate"
+    },
+    {
+      "slug": "9-shu-ju-liu-chu-li-liu-cheng",
+      "title": "数据流处理流程",
+      "file": "9-shu-ju-liu-chu-li-liu-cheng.md",
+      "section": "深入探索",
+      "group": "核心架构",
+      "level": "intermediate"
+    },
+    {
+      "slug": "10-wu-lei-he-yue-shi-jian-xiang-jie",
+      "title": "五类合约事件详解",
+      "file": "10-wu-lei-he-yue-shi-jian-xiang-jie.md",
+      "section": "深入探索",
+      "group": "事件处理系统",
+      "level": "intermediate"
+    },
+    {
+      "slug": "11-shi-jian-chu-li-qi-shi-xian-mo-shi",
+      "title": "事件处理器实现模式",
+      "file": "11-shi-jian-chu-li-qi-shi-xian-mo-shi.md",
+      "section": "深入探索",
+      "group": "事件处理系统",
+      "level": "intermediate"
+    },
+    {
+      "slug": "12-abijie-xi-yu-shu-ju-ti-qu",
+      "title": "ABI解析与数据提取",
+      "file": "12-abijie-xi-yu-shu-ju-ti-qu.md",
+      "section": "深入探索",
+      "group": "事件处理系统",
+      "level": "intermediate"
+    },
+    {
+      "slug": "13-shu-ju-ku-mo-xing-she-ji",
+      "title": "数据库模型设计",
+      "file": "13-shu-ju-ku-mo-xing-she-ji.md",
+      "section": "深入探索",
+      "group": "数据存储层",
+      "level": "intermediate"
+    },
+    {
+      "slug": "14-cang-ku-ceng-tong-yong-mo-shi",
+      "title": "仓库层通用模式",
+      "file": "14-cang-ku-ceng-tong-yong-mo-shi.md",
+      "section": "深入探索",
+      "group": "数据存储层",
+      "level": "intermediate"
+    },
+    {
+      "slug": "15-shu-ju-yan-zheng-yu-gui-fan-hua",
+      "title": "数据验证与规范化",
+      "file": "15-shu-ju-yan-zheng-yu-gui-fan-hua.md",
+      "section": "深入探索",
+      "group": "数据存储层",
+      "level": "intermediate"
+    },
+    {
+      "slug": "16-redishuan-cun-ce-lue",
+      "title": "Redis缓存策略",
+      "file": "16-redishuan-cun-ce-lue.md",
+      "section": "深入探索",
+      "group": "缓存与性能优化",
+      "level": "advanced"
+    },
+    {
+      "slug": "17-huan-cun-shi-xiao-ji-zhi",
+      "title": "缓存失效机制",
+      "file": "17-huan-cun-shi-xiao-ji-zhi.md",
+      "section": "深入探索",
+      "group": "缓存与性能优化",
+      "level": "advanced"
+    },
+    {
+      "slug": "18-cha-xun-xing-neng-you-hua",
+      "title": "查询性能优化",
+      "file": "18-cha-xun-xing-neng-you-hua.md",
+      "section": "深入探索",
+      "group": "缓存与性能优化",
+      "level": "advanced"
+    },
+    {
+      "slug": "19-rest-apishe-ji-gui-fan",
+      "title": "REST API设计规范",
+      "file": "19-rest-apishe-ji-gui-fan.md",
+      "section": "深入探索",
+      "group": "API接口层",
+      "level": "intermediate"
+    },
+    {
+      "slug": "20-tong-yong-cha-xun-can-shu-chu-li",
+      "title": "通用查询参数处理",
+      "file": "20-tong-yong-cha-xun-can-shu-chu-li.md",
+      "section": "深入探索",
+      "group": "API接口层",
+      "level": "intermediate"
+    },
+    {
+      "slug": "21-cuo-wu-chu-li-yu-xiang-ying-ge-shi",
+      "title": "错误处理与响应格式",
+      "file": "21-cuo-wu-chu-li-yu-xiang-ying-ge-shi.md",
+      "section": "深入探索",
+      "group": "API接口层",
+      "level": "intermediate"
+    },
+    {
+      "slug": "22-tian-jia-xin-shi-jian-lei-xing-zhi-nan",
+      "title": "添加新事件类型指南",
+      "file": "22-tian-jia-xin-shi-jian-lei-xing-zhi-nan.md",
+      "section": "深入探索",
+      "group": "扩展与维护",
+      "level": "advanced"
+    },
+    {
+      "slug": "23-ce-shi-yu-diao-shi-ce-lue",
+      "title": "测试与调试策略",
+      "file": "23-ce-shi-yu-diao-shi-ce-lue.md",
+      "section": "深入探索",
+      "group": "扩展与维护",
+      "level": "advanced"
+    },
+    {
+      "slug": "24-bu-shu-yu-jian-kong",
+      "title": "部署与监控",
+      "file": "24-bu-shu-yu-jian-kong.md",
+      "section": "深入探索",
+      "group": "扩展与维护",
+      "level": "advanced"
+    }
+  ]
+}
